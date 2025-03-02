@@ -1,0 +1,541 @@
+---
+title: "Final Project SRM II"
+author: "Pablo Romero Medinilla, Jorge Ramos Val y Estela Moral Durán"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+library(haven)
+library(tidyverse)
+library(countrycode)
+library(WDI)
+
+ZA7575 <- read_dta("https://github.com/pablormd/SRMII/raw/refs/heads/main/ZA7575.dta")
+
+```
+
+```{r}
+
+nationalities <- c("Belgium", "Denmark", "Germany", "Greece", "Spain", "France", "Ireland", "Italy",
+                   "Luxembourg", "Netherlands", "Portugal", "United Kingdom", "Austria", "Sweden", "Finland",
+                   "Cyprus Republic", "Czech Republic", "Estonia", "Hungary", "Latvia", "Lithuania", "Malta",
+                   "Poland", "Slovakia", "Slovenia", "Bulgaria", "Romania", "Croatia", "Other countries", NA)
+
+jobthreat_labels <- c(
+  "Automation & AI", "Free trade competition", "Protectionist tariffs",
+  "Immigration", "Ageing population", "Climate change", 
+  "Other", NA 
+)
+
+ZA7575_tidy <- ZA7575 |> 
+  mutate(
+    nationality = case_when(
+      q1_1 == 1  ~ nationalities[1],
+      q1_2 == 1  ~ nationalities[2],
+      q1_3 == 1  ~ nationalities[3],
+      q1_4 == 1  ~ nationalities[4],
+      q1_5 == 1  ~ nationalities[5],
+      q1_6 == 1  ~ nationalities[6],
+      q1_7 == 1  ~ nationalities[7],
+      q1_8 == 1  ~ nationalities[8],
+      q1_9 == 1  ~ nationalities[9],
+      q1_10 == 1 ~ nationalities[10],
+      q1_11 == 1 ~ nationalities[11],
+      q1_12 == 1 ~ nationalities[12],
+      q1_13 == 1 ~ nationalities[13],
+      q1_14 == 1 ~ nationalities[14],
+      q1_15 == 1 ~ nationalities[15],
+      q1_16 == 1 ~ nationalities[16],
+      q1_17 == 1 ~ nationalities[17],
+      q1_18 == 1 ~ nationalities[18],
+      q1_19 == 1 ~ nationalities[19],
+      q1_20 == 1 ~ nationalities[20],
+      q1_21 == 1 ~ nationalities[21],
+      q1_22 == 1 ~ nationalities[22],
+      q1_23 == 1 ~ nationalities[23],
+      q1_24 == 1 ~ nationalities[24],
+      q1_25 == 1 ~ nationalities[25],
+      q1_26 == 1 ~ nationalities[26],
+      q1_27 == 1 ~ nationalities[27],
+      q1_28 == 1 ~ nationalities[28],
+      q1_29 == 1 ~ nationalities[29],
+      q1_30 == 1 ~ NA_character_
+    )) |> 
+  mutate(d70 = case_when(
+    d70 == 5 ~ NA_real_,  
+    TRUE ~ 6 - d70        
+  )) |> 
+  mutate(globalization_attitude = case_when(
+    qa5a %in% c(1, 2, 6, 7) ~ "Positive",
+    qa5a %in% c(3, 8) ~ "Inevitable",
+    qa5a %in% c(4, 5, 9) ~ "Negative",
+    qa5a == 10 ~ "Mixed",
+    qa5a %in% c(11, 12) ~ "Other",
+    qa5a == 13 ~ NA_character_
+  )) |> 
+  mutate(job_threat = case_when(
+    qa6_1 == 1 ~ "Automation & AI",
+    qa6_2 == 1 ~ "Free trade competition",
+    qa6_3 == 1 ~ "Protectionist tariffs",
+    qa6_4 == 1 ~ "Immigration",
+    qa6_5 == 1 ~ "Ageing population",
+    qa6_6 == 1 ~ "Climate change",
+    qa6_7 == 1 ~ "Other",
+    qa6_8 == 1 ~ NA_character_,
+    TRUE ~ NA_character_
+  )) |> 
+  mutate(qa7 = case_when(
+    qa7 == 5 ~ NA_real_,  
+    TRUE ~ 6 - qa7        
+  )) |> 
+  mutate(business_view = case_when(
+    qa10_1 == 1 ~ "Consumers choose",
+    qa10_2 == 1 ~ "Fair treatment in developing countries",
+    qa10_3 == 1 ~ "EU should encourage improvement",
+    qa10_4 == 1 ~ "EU should take measures",
+    qa10_5 == 1 ~ "None",
+    qa10_6 == 1 ~ NA_character_,
+    TRUE ~ NA_character_
+  )) |> 
+  mutate(trade_rules_view = case_when(
+    qa11 == 1 ~ "No rules, best deals",
+    qa11 == 2 ~ "Rules needed, but not followed",
+    qa11 == 3 ~ "Rules create level playing field",
+    qa11 == 4 ~ "None",
+    qa11 == 5 ~ NA_character_,
+    TRUE ~ NA_character_
+  )) |> 
+  mutate(protectionism_view = case_when(
+    qa12 == 1 ~ "Increase duties to protect EU industry",
+    qa12 == 2 ~ "Increase duties only if others do",
+    qa12 == 3 ~ "Do not increase duties, risk of higher duties",
+    qa12 == 4 ~ "Do not increase duties, would raise prices",
+    qa12 == 5 ~ "None",
+    qa12 == 6 ~ NA_character_,
+    TRUE ~ NA_character_
+  )) |> 
+  mutate(info_source = case_when(
+    qa18a == 1 ~ "TV",
+    qa18a == 2 ~ "Newspapers or magazines",
+    qa18a == 3 ~ "Radio",
+    qa18a == 4 ~ "Internet websites",
+    qa18a == 5 ~ "Online social networks",
+    qa18a == 6 ~ "Family, friends or colleagues",
+    qa18a == 7 ~ "Other",
+    qa18a == 8 ~ NA_character_,
+    TRUE ~ NA_character_
+  )) |> 
+  mutate(energy_label_influence = case_when(
+    qb8 == 1 ~ "Saved money with energy-efficient appliance",
+    qb8 == 2 ~ "Chosen for environmental reasons",
+    qb8 == 3 ~ "Both reasons",
+    qb8 == 4 ~ "No influence",
+    qb8 == 5 ~ NA_character_,
+    TRUE ~ NA_character_
+  )) |> 
+  mutate(energy_priority = case_when(
+    qb9_1 == 1 ~ "Reduce overall energy consumption",
+    qb9_7 == 1 ~ "Step up international efforts on climate change",
+    qb9_2 == 1 ~ "Ensure stable energy supply through better infrastructure",
+    qb9_3 == 1 ~ "Ensure low energy costs",
+    qb9_4 == 1 ~ "Reduce EU energy imports",
+    qb9_8 == 1 ~ "Protect critical energy infrastructure",
+    qb9_9 == 1 ~ "Provide clear information to consumers",
+    qb9_10 == 1 ~ "Other",
+    qb9_11 == 1 ~ "None",
+    qb9_5 == 1 ~ "Invest in clean energy technologies",
+    qb9_6 == 1 ~ "Enhance international cooperation",
+    qb9_12 == 1 ~ NA_character_,
+    TRUE ~ NA_character_
+  )) |> 
+  mutate(
+    lgbtiq_friend = case_when(
+      sd1_4 == 1 ~ "Yes",
+      sd1_4 == 2 ~ "No",
+      sd1_4 == 3 ~ "Refusal",
+      sd1_4 == 4 ~ "DK",
+      TRUE ~ NA_character_
+    ),
+    trans_friend = case_when(
+      sd1_7 == 1 ~ "Yes",
+      sd1_7 == 2 ~ "No",
+      sd1_7 == 3 ~ "Refusal",
+      sd1_7 == 4 ~ "DK",
+      TRUE ~ NA_character_
+    )
+  ) |> 
+  mutate(
+    lgbt_identity = case_when(
+      sd2_5 == 5 ~ "Yes", 
+      TRUE ~ "No" 
+    )
+  ) |> 
+  mutate(
+    religion = case_when(
+      sd3 == 1 ~ "Catholic",
+      sd3 == 2 ~ "Orthodox Christian",
+      sd3 == 3 ~ "Protestant",
+      sd3 == 4 ~ "Other Christian", 
+      sd3 == 5 ~ "Jewish",
+      sd3 == 6 ~ "Muslim - Shia", 
+      sd3 == 7 ~ "Muslim - Sunni",
+      sd3 == 8 ~ "Other Muslim",
+      sd3 == 9 ~ "Sikh",
+      sd3 == 10 ~ "Buddhist", 
+      sd3 == 11 ~ "Hindu",
+      sd3 == 12 ~ "Atheist",
+      sd3 == 13 ~ "Non believe or agnostic",
+      sd3 == 14 ~ "Other",
+      sd3 == 15 ~ "Refusal",
+      sd3 == 16 ~ "DK", 
+      TRUE ~ NA_character_
+    )
+  ) |> 
+  mutate(
+    sexual_orientation_discrimination = case_when(
+      qc1_4 == 1 ~ "Very widespread",  
+      qc1_4 == 2 ~ "Fairly widespread",  
+      qc1_4 == 3 ~ "Fairly rare",  
+      qc1_4 == 4 ~ "Very rare",  
+      qc1_4 == 5 ~ "Non-existent",  
+      qc1_4 == 6 ~ "DK",  
+      TRUE ~ NA_character_  
+    ),
+    transgender_discrimination = case_when(
+      qc1_8 == 1 ~ "Very widespread",  
+      qc1_8 == 2 ~ "Fairly widespread",  
+      qc1_8 == 3 ~ "Fairly rare",  
+      qc1_8 == 4 ~ "Very rare",  
+      qc1_8 == 5 ~ "Non-existent",  
+      qc1_8 == 6 ~ "DK",  
+      TRUE ~ NA_character_  
+    ),
+    intersex_discrimination = case_when(
+      qc1_9 == 1 ~ "Very widespread",  
+      qc1_9 == 2 ~ "Fairly widespread",
+      qc1_9 == 3 ~ "Fairly rare",  
+      qc1_9 == 4 ~ "Very rare", 
+      qc1_9 == 5 ~ "Non-existent",
+      qc1_9 == 6 ~ "DK",  
+      TRUE ~ NA_character_
+    )
+  ) |> 
+  mutate(
+    sexual_orientation_experienced = if_else(qc2_4 == 1, 1, 0),
+    transgender_experienced = if_else(qc2_6 == 1, 1, 0),
+    intersex_experienced = if_else(qc2_7 == 1, 1, 0)
+  ) |> 
+  mutate(
+    discrimination_situation = case_when(
+      qc3 == 1 ~ "Looking for a job",
+      qc3 == 2 ~ "At work",
+      qc3 == 3 ~ "Looking for housing",
+      qc3 == 4 ~ "Healthcare personnel",
+      qc3 == 5 ~ "Social service personnel",
+      qc3 == 6 ~ "School or university personnel",
+      qc3 == 7 ~ "At café, restaurant, bar, or nightclub",
+      qc3 == 8 ~ "In a shop or bank",
+      qc3 == 9 ~ "In a public space",
+      qc3 == 10 ~ "Other",
+      qc3 == 11 ~ "DK",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  mutate(
+    anti_discrimination_action = case_when(
+      qc5_1 == 1 | qc5_2 == 1 | qc5_3 == 1 | qc5_4 == 1 ~ "Yes",
+      qc5_1 == 2 & qc5_2 == 2 & qc5_3 == 2 & qc5_4 == 2 ~ "No",
+      TRUE ~ "DK"
+    )
+  ) %>%
+  mutate(
+    comfort_lgb_politician = case_when(
+      qc6_2 %in% 1:3 ~ "Low",
+      qc6_2 %in% 4:7 ~ "Medium",
+      qc6_2 %in% 8:10 ~ "High",
+      qc6_2 == 11 ~ "Indifferent",
+      qc6_2 == 12 ~ "DK"
+    ),
+    comfort_trans_politician = case_when(
+      qc6_10 %in% 1:3 ~ "Low",
+      qc6_10 %in% 4:7 ~ "Medium",
+      qc6_10 %in% 8:10 ~ "High",
+      qc6_10 == 11 ~ "Indifferent",
+      qc6_10 == 12 ~ "DK"
+    ),
+    comfort_intersex_politician = case_when(
+      qc6_11 %in% 1:3 ~ "Low",
+      qc6_11 %in% 4:7 ~ "Medium",
+      qc6_11 %in% 8:10 ~ "High",
+      qc6_11 == 11 ~ "Indifferent",
+      qc6_11 == 12 ~ "DK"
+    )
+  )%>%
+  mutate(
+    report_discrimination = case_when(
+      qc10 == 1 ~ "Trade Unions",
+      qc10 == 2 ~ "NGOs/Associations",
+      qc10 == 3 ~ "Courts",
+      qc10 == 4 ~ "Equalities body/Ombudsman",
+      qc10 == 5 ~ "Lawyer",
+      qc10 == 6 ~ "Police",
+      qc10 == 7 ~ "Friend/Family",
+      qc10 == 8 ~ "Dispute Resolution",
+      qc10 == 9 ~ "Other",
+      qc10 == 10 ~ "DK"
+    )
+  ) %>%
+  mutate(
+    comfort_lgb_colleague = case_when(
+      qc12_10 == 1 ~ "Not at all comfortable",
+      qc12_10 == 10 ~ "Totally comfortable",
+      qc12_10 == 11 ~ "Indifferent",
+      qc12_10 == 12 ~ "DK",
+      TRUE ~ as.character(qc12_10)
+    ),
+    comfort_trans_colleague = case_when(
+      qc12_11 == 1 ~ "Not at all comfortable",
+      qc12_11 == 10 ~ "Totally comfortable",
+      qc12_11 == 11 ~ "Indifferent",
+      qc12_11 == 12 ~ "DK",
+      TRUE ~ as.character(qc12_11)
+    ),
+    comfort_intersex_colleague = case_when(
+      qc12_12 == 1 ~ "Not at all comfortable",
+      qc12_12 == 10 ~ "Totally comfortable",
+      qc12_12 == 11 ~ "Indifferent",
+      qc12_12 == 12 ~ "DK",
+      TRUE ~ as.character(qc12_12)
+    )
+  ) %>%
+  mutate(
+    equal_rights_lgb = case_when(
+      qc15_1 == 1 ~ "Totally agree",
+      qc15_1 == 2 ~ "Tend to agree",
+      qc15_1 == 3 ~ "Tend to disagree",
+      qc15_1 == 4 ~ "Totally disagree",
+      qc15_1 == 5 ~ "DK",
+      TRUE ~ as.character(qc15_1)
+    ),
+    accept_same_sex_relationship = case_when(
+      qc15_2 == 1 ~ "Totally agree",
+      qc15_2 == 2 ~ "Tend to agree",
+      qc15_2 == 3 ~ "Tend to disagree",
+      qc15_2 == 4 ~ "Totally disagree",
+      qc15_2 == 5 ~ "DK",
+      TRUE ~ as.character(qc15_2)
+    ),
+    allow_same_sex_marriage = case_when(
+      qc15_3 == 1 ~ "Totally agree",
+      qc15_3 == 2 ~ "Tend to agree",
+      qc15_3 == 3 ~ "Tend to disagree",
+      qc15_3 == 4 ~ "Totally disagree",
+      qc15_3 == 5 ~ "DK",
+      TRUE ~ as.character(qc15_3)
+    )
+  ) %>%
+  mutate(
+    change_docs_trans = case_when(
+      qc19 == 1 ~ "Yes",
+      qc19 == 2 ~ "No",
+      qc19 == 3 ~ "DK",
+      TRUE ~ as.character(qc19)
+    )
+  ) %>%
+  mutate(
+    third_gender_option = case_when(
+      qc20 == 1 ~ "Yes",
+      qc20 == 2 ~ "No",
+      qc20 == 3 ~ "DK",
+      TRUE ~ as.character(qc20)
+    )
+  ) %>%
+  mutate(
+    political_orientation_group = case_when(
+      d1 %in% 1:2  ~ "Far Left",
+      d1 %in% 3:4  ~ "Left",
+      d1 %in% 5:6  ~ "Center",
+      d1 %in% 7:8  ~ "Right",
+      d1 %in% 9:10 ~ "Far Right",
+      d1 == 11     ~ "Refusal",
+      d1 == 12     ~ "DK",
+      TRUE         ~ NA_character_
+    )
+  ) %>%
+  mutate(
+    gender = case_when(
+      d10 == 1 ~ "Man",
+      d10 == 2 ~ "Woman",
+      TRUE     ~ NA_character_
+    )
+  ) %>%
+  mutate(
+    occupation = case_when(
+      d15a == 1 ~ "Non-active: Responsible for home or not working",
+      d15a == 2 ~ "Non-active: Student",
+      d15a == 3 ~ "Non-active: Unemployed or temporarily not working",
+      d15a == 4 ~ "Non-active: Retired or unable to work due to illness",
+      d15a == 5 ~ "Self-employed: Farmer",
+      d15a == 6 ~ "Self-employed: Fisherman",
+      d15a == 7 ~ "Self-employed: Professional (lawyer, medical, etc.)",
+      d15a == 8 ~ "Self-employed: Shop owner, craftsmen, or other self-employed",
+      d15a == 9 ~ "Self-employed: Business owner (full or partner)",
+      d15a == 10 ~ "Employed: Professional (doctor, lawyer, etc.)",
+      d15a == 11 ~ "Employed: General management, director, or top management",
+      d15a == 12 ~ "Employed: Middle management or other management",
+      d15a == 13 ~ "Employed: Desk job",
+      d15a == 14 ~ "Employed: Job involving travel (sales, driver, etc.)",
+      d15a == 15 ~ "Employed: Service job (hospital, restaurant, police, etc.)",
+      d15a == 16 ~ "Employed: Supervisor",
+      d15a == 17 ~ "Employed: Skilled manual worker",
+      d15a == 18 ~ "Employed: Other (unskilled) manual worker or servant",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  mutate(
+    residence_area = case_when(
+      d25 == 1 ~ "Rural area or village",
+      d25 == 2 ~ "Small or middle sized town",
+      d25 == 3 ~ "Large town",
+      d25 == 4 ~ "DK",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  mutate(
+    social_class = case_when(
+      d63 == 1 ~ "Working class",
+      d63 == 2 ~ "Lower middle class",
+      d63 == 3 ~ "Middle class",
+      d63 == 4 ~ "Upper middle class",
+      d63 == 5 ~ "Higher class",
+      d63 == 6 ~ "Other",
+      d63 == 7 ~ "None",
+      d63 == 8 ~ "Refusal",
+      d63 == 9 ~ "DK",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  mutate(
+    my_voice_in_eu = case_when(
+      d72_1 == 1 ~ "Totally agree",
+      d72_1 == 2 ~ "Tend to agree",
+      d72_1 == 3 ~ "Tend to disagree",
+      d72_1 == 4 ~ "Totally disagree",
+      d72_1 == 5 ~ "Refusal",
+      d72_1 == 6 ~ "DK",
+      TRUE ~ NA_character_
+    ),
+    my_voice_in_country = case_when(
+      d72_2 == 1 ~ "Totally agree",
+      d72_2 == 2 ~ "Tend to agree",
+      d72_2 == 3 ~ "Tend to disagree",
+      d72_2 == 4 ~ "Totally disagree",
+      d72_2 == 5 ~ "Refusal",
+      d72_2 == 6 ~ "DK",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  mutate(
+    persuade_others = case_when(
+      d77 == 1 ~ "Often",
+      d77 == 2 ~ "From time to time",
+      d77 == 3 ~ "Rarely",
+      d77 == 4 ~ "Never",
+      d77 == 5 ~ "DK",
+      TRUE ~ NA_character_
+    )
+  ) |> 
+  select(country, isocntry, d11, d11r1, nationality, gender, occupation, residence_area, social_class, d70, polintr, globalization_attitude, job_threat, qa7, business_view, trade_rules_view, protectionism_view, info_source, energy_label_influence, energy_priority, trans_friend, lgbtiq_friend, lgbt_identity, religion, sexual_orientation_discrimination, transgender_discrimination, intersex_discrimination, sexual_orientation_experienced, transgender_experienced, intersex_experienced, discrimination_situation, anti_discrimination_action, comfort_lgb_politician, comfort_trans_politician, comfort_intersex_politician, report_discrimination, comfort_lgb_colleague, comfort_trans_colleague, comfort_intersex_colleague, equal_rights_lgb, accept_same_sex_relationship, allow_same_sex_marriage, change_docs_trans, third_gender_option, political_orientation_group, my_voice_in_eu, my_voice_in_country, persuade_others, p1, p2, p3, p4, p5, p6, p7, p13)
+
+
+```
+
+```{r}
+
+ZA7575_tidy <- ZA7575_tidy %>%
+  rename(age = d11) %>%
+  rename(age_4cat = d11r1)
+
+colnames(ZA7575_tidy)[colnames(ZA7575_tidy) == "d70"] <- "life_satisfaction"
+
+ZA7575_tidy <- ZA7575_tidy %>%
+  rename(eu_trade_effectiveness = qa7)
+
+```
+
+```{r}
+
+ZA7575_tidy <- ZA7575_tidy %>%
+  mutate(country = countrycode(isocntry, "iso2c", "country.name")) %>%
+  mutate(country = case_when(
+    isocntry == "DE-E" ~ "East Germany",
+    isocntry == "DE-W" ~ "West Germany",
+    TRUE ~ country 
+  ))
+
+ZA7575_tidy$country <- gsub("Slovakia", "Slovak Republic", ZA7575_tidy$country)
+
+```
+
+```{r}
+
+eu_countries <- c(
+  "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "DE", "EE", "FI", 
+  "FR", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", 
+  "PL", "PT", "RO", "SK", "SI", "ES", "SE", "GB"
+)
+
+indicators <- c(
+  "NY.GDP.PCAP.PP.KD",  # PIB per cápita (PPA, constante 2011)
+  "SE.XPD.TOTL.GD.ZS",  # Gasto en educación (% del PIB)
+  "SH.XPD.CHEX.GD.ZS",  # Gasto en salud (% del PIB)
+  "SP.DYN.LE00.IN",      # Esperanza de vida al nacer
+  "SP.URB.TOTL.IN.ZS",   # Población urbana (% del total)
+  "SI.POV.GINI",         # Índice de Gini (desigualdad)
+  "NE.TRD.GNFS.ZS",      # Comercio exterior (% del PIB)
+  "BX.KLT.DINV.WD.GD.ZS",# Inversión extranjera directa neta (% del PIB)
+  "IT.NET.USER.ZS",      # Usuarios de Internet (% de la población)
+  "SI.DST.10TH.10",      # Ingreso del 10% más rico (% del total)
+  "BX.KLT.DINV.CD.WD",   # Total de inversión extranjera directa (USD)
+  "GB.XPD.RSDV.GD.ZS",   # Gasto en I+D (% del PIB)
+  "GC.XPN.TOTL.GD.ZS",   # Gasto del gobierno (% del PIB)
+  "NV.AGR.TOTL.ZS",      # Valor agregado de la agricultura (% del PIB)
+  "SE.TER.ENRR"          # Matrícula en educación terciaria (%)
+)
+
+wdi_data <- WDI(country = eu_countries, indicator = indicators, start = 2019, end = 2019, extra = FALSE)
+
+```
+
+```{r}
+
+wdi_data <- wdi_data %>%
+  rename(
+    gdp_per_capita = NY.GDP.PCAP.PP.KD,
+    education_spending = SE.XPD.TOTL.GD.ZS,
+    health_spending = SH.XPD.CHEX.GD.ZS,
+    life_expectancy = SP.DYN.LE00.IN,
+    urban_population = SP.URB.TOTL.IN.ZS,
+    gini_index = SI.POV.GINI,
+    foreign_trade = NE.TRD.GNFS.ZS,
+    foreign_investment = BX.KLT.DINV.WD.GD.ZS,
+    internet_users = IT.NET.USER.ZS,
+    income_10th_percentile = SI.DST.10TH.10,
+    total_foreign_investment = BX.KLT.DINV.CD.WD,
+    research_spending = GB.XPD.RSDV.GD.ZS,
+    government_spending = GC.XPN.TOTL.GD.ZS,
+    agriculture_contribution = NV.AGR.TOTL.ZS,
+    tertiary_education_enrollment = SE.TER.ENRR
+  )
+
+ZA7575_tidy <- merge(ZA7575_tidy, wdi_data, by = "country", all.x = TRUE)
+
+```
+
+
